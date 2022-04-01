@@ -510,7 +510,7 @@ public final class NatsReader implements Supplier<List<EventMessage>> , NatsCons
             logger.error("Error  ",e);
         }
     }
-    public void publishAllPartitions(int numberPartitions, int numMsgsPerPartition, int useId, int timeId) {
+    public void publishAllPartitions(int numberPartitions, int numMsgsPerPartition, int useId, int timeId,int group) {
         Date now = java.util.Calendar.getInstance().getTime();
 
         for (int partition = 0; partition < numberPartitions; partition++){
@@ -528,7 +528,7 @@ public final class NatsReader implements Supplier<List<EventMessage>> , NatsCons
                     .withBillPeriodID(98)
                     .withRateEventType("rateEventType")
                     .withRootCustomerIDHash(partition);
-            String subject = Integer.toString(partition)+"."+Integer.toString(timeId)+"."+useId;
+            String subject = Integer.toString(partition) + "." + Integer.toString(timeId) + "." + useId;
             /**
              * publish numMsgsPerPartition for this partition
              */
@@ -548,6 +548,7 @@ public final class NatsReader implements Supplier<List<EventMessage>> , NatsCons
         try {
             transfer.serialize(output);
             publish(output, 1, "Transfers.WRITING");
+            System.out.println("Published message with subject [Transfers.WRITING]");
         } catch (IOException e) {
             logger.error("Error unable to publish Transfer entry to NATS ",e);
         }
@@ -591,7 +592,7 @@ public final class NatsReader implements Supplier<List<EventMessage>> , NatsCons
                 natsReader.deletePartitionedEventStreams(reader.numPartitions);
                 break;
             case publishPartitionedStreams:
-                natsReader.publishAllPartitions(reader.numPartitions, reader.msgCount, reader.useId, reader.timeId);
+                natsReader.publishAllPartitions(reader.numPartitions, reader.msgCount, reader.useId, reader.timeId, reader.group);
                 break;
         }
     }
