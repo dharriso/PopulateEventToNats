@@ -33,3 +33,16 @@ dependencies {
 test {
     useJUnitPlatform()
 }
+project.configurations.implementation.setCanBeResolved(true)
+
+task fatJar(type: Jar) {
+    duplicatesStrategy(DuplicatesStrategy.WARN)
+    manifest {
+        attributes 'Implementation-Title': 'Publish Events to Nats',
+                'Implementation-Version': 1,
+                'Main-Class': 'com.optiva.tools.addevents.NatsReader'
+    }
+    //baseName = project.name + '-all'
+    from { configurations.implementation.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
+}
