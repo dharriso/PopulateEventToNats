@@ -45,4 +45,27 @@ For testing we typically perform the following
   "-partitions=256 -s=192.168.49.2:30409 -mc=200 -tst=publishPartitionedStreams -timeId=109 -useId=33 -group=1"
   "-partitions=256 -s=192.168.49.2:30409 -mc=200 -tst=publishPartitionedStreams -timeId=321 -useId=19 -group=1"
   
-Note that the timeId is changing. This ensures that 
+Note that the timeId is changing. This ensures that ...
+
+## Deploying the fat jar and running the test harness 
+In order to execute the test harness easily in a deployed env where NATS is not exposed to an external IP.
+1. Execute the fatJar gradle task, this will create a jar file under build/libs/PopulateEventToNats-1.0-SNAPSHOT.jar (or something very similar)
+2. Copy the jar file to a temporary directory on one of the pods that has java already available (for example ocs-aio-0)
+   1. if you have kubectl configured locally to access a remote env then you can use the following command from the build/libs directory
+      1. `kubectl cp -n oce-dc01  PopulateEventToNats-1.0-SNAPSHOT.jar ocs-aio-0:/tmp/PopulateEventToNats-1.0-SNAPSHOT.jar -c main`
+3. Once copied to the remote pod, log into the pod
+   1. if you have the oc cli tooling installed and configured you can use something like the following command
+      1. `oc -n oce-dc01 -it exec ocs-aio-0 -c main -- bash`
+4. Once connect to the pod, if you are setting up the NATS env then create the streams first
+   1. `java -jar /tmp/PopulateEventToNats-1.0-SNAPSHOT.jar -tst=createPartitionedStreams -s=ocernd03-eh-nats.ocernd03-eh.svc:4222`
+   2. in the above command notice the URL being used for NATS, this is using the NATS service name on the default port `ocernd03-eh-nats.ocernd03-eh.svc:4222`
+5. Once the streams are created you can publish dummy messages or if you have an existing environment that already has messages in the oracle CUSTDB you can use those
+6. To publish dummy messages - if you want to populate differet timeid an useid messages then you'll need to run this command multiple times
+   1. `java -jar /tmp/PopulateEventToNats-1.0-SNAPSHOT.jar -partitions=256 -s=ocernd03-eh-nats.ocernd03-eh.svc:4222 -mc=10 -tst=publishPartitionedStreams -timeId=66 -useId=22 -group=1`
+7. To publish all events currently in the CUSTDB
+   1. `java -Djdbc.drivers=oracle.jdbc.driver.OracleDriver -jar /tmp/PopulateEventToNats-1.0-SNAPSHOT.jar -tst=publishFromDb -s=ocernd03-eh-nats.ocernd03-eh.svc:4222 -cdbip=10.224.60.128 -cdbport=1535`
+   2. The code is assuming the default userid of adv and the password has not been changed from the default generated password.
+8. If you need to reset the NATS streams , the easiest way is to first delete them and then recreate them
+9. To delete all partitions
+   1. `java -jar /tmp/PopulateEventToNats-1.0-SNAPSHOT.jar -tst=deletePartitionedStreams -s=ocernd03-eh-nats.ocernd03-eh.svc:4222`
+
