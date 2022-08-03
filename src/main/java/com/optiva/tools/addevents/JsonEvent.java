@@ -8,6 +8,7 @@ import com.dslplatform.json.JsonWriter;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 
@@ -707,4 +708,17 @@ public final class JsonEvent implements EventMessage, EventSerialization {
         return this;
     }
 
+    @Override
+    public String toString() {
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+
+        try {
+            this.serialize(baos);
+            return baos.toString();
+        } catch (IOException e) {
+            return "";
+        }
+
+    }
 }

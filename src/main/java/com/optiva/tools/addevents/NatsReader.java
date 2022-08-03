@@ -7,6 +7,7 @@ import io.nats.client.api.StreamConfiguration;
 import io.nats.client.api.StreamInfo;
 import io.nats.client.impl.NatsMessage;
 import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.time.StopWatch;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import picocli.CommandLine;
@@ -21,6 +22,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
@@ -61,6 +63,16 @@ public final class NatsReader implements Supplier<List<EventMessage>>, NatsConsu
     public String custDbIp;
     @CommandLine.Option(names = {"-cdbport", "--customerDBPort"}, paramLabel = "CustomerDBPortToPullFrom", description = "The Port of the CUSTDB that holds the events that should be published to NATS")
     public Integer custDbPort;
+    @CommandLine.Option(names = {"-rcidh", "--rootCustomerIdHash"}, paramLabel = "RootCustomerIdHash", description = "The Root Customer Id Hash - this will be from 0-255")
+    public String rootCustomerIdHash;
+    @CommandLine.Option(names = {"-rcid", "--rootCustomerId"}, paramLabel = "RootCustomerId", description = "The Root Customer Id - this can be used to derive the RootCustomerIdHash, and will also help filter a stream.")
+    public String rootCustomerId;
+    @CommandLine.Option(names = {"-et", "--eventType"}, paramLabel = "EventType", description = "The Event Type - is populated this will be used to filter any messages.")
+    public Integer eventType;
+    @CommandLine.Option(names = {"-ret", "--ratingEventType"}, paramLabel = "RatingEventType", description = "The Rating Event Type - is populated this will be used to filter any messages.")
+    public String ratingEventType;
+    @CommandLine.Option(names = {"-co", "--countOnly"}, defaultValue = "false", paramLabel = "Only Display Count of Messages Found.", description = "Instead of displaying the messages only display the count.")
+    public Boolean countOnly;
     @CommandLine.Spec
     CommandLine.Model.CommandSpec spec; // injected by picocli
     @CommandLine.Option(names = {"-h", "--help"}, usageHelp = true, description = "display this help message")
@@ -80,53 +92,141 @@ public final class NatsReader implements Supplier<List<EventMessage>>, NatsConsu
     }
 
     public static void main(String[] args) {
-        NatsReader reader = new NatsReader(null);
-        CommandLine commandLine = new CommandLine(reader);
+
+        StopWatch stopWatch = StopWatch.createStarted();
+
         try {
-            commandLine.parseArgs(args);
-            reader.validate();
-            if (commandLine.isUsageHelpRequested()) {
+            NatsReader reader = new NatsReader(null);
+            CommandLine commandLine = new CommandLine(reader);
+            try {
+                commandLine.parseArgs(args);
+                reader.validate();
+                if (commandLine.isUsageHelpRequested()) {
+                    commandLine.usage(System.out);
+                    return;
+                }
+                printSplitTime(stopWatch, "Successfully parsed command line arguments ");
+            } catch (CommandLine.ParameterException ex) {
+                logger.error(ex.getMessage());
                 commandLine.usage(System.out);
                 return;
             }
-        } catch (CommandLine.ParameterException ex) {
-            logger.error(ex.getMessage());
-            commandLine.usage(System.out);
-            return;
+
+
+            reader.populateRootCustomerIdHashIfNeeded(reader);
+
+            logger.error("Test to execute : {}", reader.tstName);
+            logger.error("Nats Server :{}", reader.endpoint);
+            logger.error("Number of partitions :{} ", reader.numPartitions);
+            logger.error("Number of message to send to each partitions :{} ", reader.msgCount);
+            logger.error("timeId :{} useId :{} ", reader.timeId, reader.useId);
+            logger.error("custDbIp :{} ", reader.custDbIp);
+            logger.error("custDbPort :{} ", reader.custDbPort);
+            logger.error("rootCustomerIdHash : {}", reader.rootCustomerIdHash);
+            logger.error("rootCustomerId : {}", reader.rootCustomerId);
+            logger.error("eventType : {}", reader.eventType);
+            logger.error("ratingEventType : {}", reader.ratingEventType);
+            logger.error("countOnly : {}", reader.countOnly);
+
+            reader.configuration = new NatsReaderConfiguration(true, reader.getSubject(reader),
+                    reader.getFilter(reader),
+                    "PULL", true,
+                    reader.endpoint, "queueName",
+                    "Events_", "CUSTOMER_CONSUMER_" + reader.rootCustomerIdHash,
+                    1000, 3, 40, connectByteBufferSize,
+                    initialMaxWaitTimeMs, maxWaitTimeMs);
+            printSplitTime(stopWatch, "Finished all configuration ");
+            switch (reader.tstName) {
+                case createPartitionedStreams:
+                    reader.createPartitionedEventStreams(reader.numPartitions);
+                    printSplitTime(stopWatch, "Created all Partitions ");
+                    break;
+                case deletePartitionedStreams:
+                    reader.deletePartitionedEventStreams(reader.numPartitions);
+                    printSplitTime(stopWatch, "Deleted ALl Partitions ");
+                    break;
+                case publishPartitionedStreams:
+                    reader.publishAllPartitions(reader.numPartitions, reader.msgCount, reader.useId, reader.timeId, reader.group);
+                    printSplitTime(stopWatch, "Published all dummy messages ");
+                    break;
+                case publishFromDb:
+                    reader.publishFromDb(reader.custDbIp, reader.custDbPort);
+                    printSplitTime(stopWatch, "Published all Messages from CustDB");
+                    break;
+                case getMessages:
+
+                    try {
+                        List<EventMessage> messages = reader.get();
+                        printSplitTime(stopWatch, "Read and filtered all messages ");
+                        if (reader.countOnly) {
+                            System.out.printf("Found %d messages that match the criteria.%n", messages.size());
+                        } else {
+                            messages.stream().forEach(System.out::println);
+                            System.out.printf("Found %d messages that match the criteria.%n", messages.size());
+                        }
+                    } finally {
+                        reader.deleteConsumer();
+                        printSplitTime(stopWatch, "Deleted the consumer ");
+                    }
+                    break;
+
+            }
+        } finally {
+            stopWatch.stop();
+            System.out.printf("Completed in %d ms.%n", stopWatch.getTime());
         }
+    }
 
-        logger.error("Test to execute : {}", reader.tstName);
-        logger.error("Nats Server :{}", reader.endpoint);
-        logger.error("Number of partitions :{} ", reader.numPartitions);
-        logger.error("Number of message to send to each partitions :{} ", reader.msgCount);
-        logger.error("timeId :{} useId :{} ", reader.timeId, reader.useId);
-        logger.error("custDbIp :{} ", reader.custDbIp);
-        logger.error("custDbPort :{} ", reader.custDbPort);
+    private static void printSplitTime(StopWatch stopWatch, String message) {
+        stopWatch.split();
+        System.out.printf("%s : %s. %n", message.trim(), stopWatch.toSplitString());
 
-        reader.configuration = new NatsReaderConfiguration(true, "Events.>",
-                null,
-                "PULL", true,
-                reader.endpoint, "queueName",
-                "Events", "durableName",
-                1000, 3, 40, connectByteBufferSize,
-                initialMaxWaitTimeMs, maxWaitTimeMs);
+    }
 
-        switch (reader.tstName) {
-            case createPartitionedStreams:
-                reader.createPartitionedEventStreams(reader.numPartitions);
-                break;
-            case deletePartitionedStreams:
-                reader.deletePartitionedEventStreams(reader.numPartitions);
-                break;
-            case publishPartitionedStreams:
-                reader.publishAllPartitions(reader.numPartitions, reader.msgCount, reader.useId, reader.timeId, reader.group);
-                break;
-            case publishFromDb:
-                reader.publishFromDb(reader.custDbIp, reader.custDbPort);
-                break;
-            case getMessages:
-                throw new RuntimeException("TODO - NEEDS TO BE IMPLEMENTED!");
+    /**
+     * The consumer is a durable object, it needs to be removed when done.
+     */
+    private void deleteConsumer() {
+        Options options = new Options.Builder().
+                server(configuration.getUrl()).
+                connectionListener(new NatsConnectionListener(this)).
+                reconnectBufferSize(configuration.getConnectionByteBufferSize()).  // Set buffer in bytes
+                        build();
 
+        try (Connection nc = Nats.connect(options)) {
+            JetStreamManagement jsm = nc.jetStreamManagement();
+            jsm.deleteConsumer(configuration.getStreamName() + rootCustomerIdHash, configuration.getDurableName());
+        } catch (IOException e) {
+            logger.error("I/O error communicating to the NATS server.", e);
+        } catch (InterruptedException | JetStreamApiException e) {
+            logger.error("Processing JetStream messages error.", e);
+        }
+    }
+
+    private String getFilter(NatsReader reader) {
+        if (ObjectUtils.isNotEmpty(reader.rootCustomerId) ) {
+            return String.format("Events.%s.*.*.%s", reader.rootCustomerIdHash, reader.rootCustomerId );
+        } else {
+            return String.format("Events.%s.*.*.*", reader.rootCustomerIdHash);
+        }
+    }
+
+    private String getSubject(NatsReader reader) {
+        if (ObjectUtils.isNotEmpty(reader.rootCustomerIdHash) ) {
+            return String.format("Events.%s.>", reader.rootCustomerIdHash );
+        } else {
+            return "Events.>";
+        }
+    }
+
+    /**
+     * This is using a Utils static method that was copied from the OCE-Nats-GG-Nats-Gridgain-EventDB repo
+     * @param reader basically 'this' as everything is being called from a static main method.
+     * @throws Exception
+     */
+    private void populateRootCustomerIdHashIfNeeded(NatsReader reader)  {
+        if (ObjectUtils.isEmpty(reader.rootCustomerIdHash) && ObjectUtils.isNotEmpty(rootCustomerId)) {
+            reader.rootCustomerIdHash = String.valueOf(Utils.computeCustomerPartitionId(reader.rootCustomerId, reader.numPartitions));
         }
     }
 
@@ -136,16 +236,29 @@ public final class NatsReader implements Supplier<List<EventMessage>>, NatsConsu
      */
     void validate() {
 
-        if (tstName == TestCases.publishFromDb) {
-            if (missing(custDbIp) || missing(custDbPort)) {
-                throw new CommandLine.ParameterException(spec.commandLine(),
-                        "Missing options: when trying to publish db events to streams the  " +
-                                "{-s, --server} option must be specified, " +
-                                "{-cdbip, --customerDBIP} option must be specified , " +
-                                "{-cdbport, --customerDBPort} option must also be specified, " +
-                                "ensure all of these are included. \n" +
-                                "To see the default values for the rest of the parameters please provide -h or --help to print the usage info.");
-            }
+        switch (tstName) {
+            case getMessages:
+                if (missing(rootCustomerId) && missing(rootCustomerIdHash)) {
+                    throw new CommandLine.ParameterException(spec.commandLine(),
+                            "Missing options: when trying to get messages from the streams the  " +
+                                    "{-s, --server} option must be specified, " +
+                                    "{-rcid, --rootCustomerId} option must be specified , " +
+                                    "{-rcidh, --rootCustomerIdHash} option must also be specified, " +
+                                    "ensure all of these are included. \n" +
+                                    "To see the default values for the rest of the parameters please provide -h or --help to print the usage info.");
+                }
+                break;
+            case publishFromDb:
+                if (missing(custDbIp) || missing(custDbPort)) {
+                    throw new CommandLine.ParameterException(spec.commandLine(),
+                            "Missing options: when trying to publish db events to streams the  " +
+                                    "{-s, --server} option must be specified, " +
+                                    "{-cdbip, --customerDBIP} option must be specified , " +
+                                    "{-cdbport, --customerDBPort} option must also be specified, " +
+                                    "ensure all of these are included. \n" +
+                                    "To see the default values for the rest of the parameters please provide -h or --help to print the usage info.");
+                }
+                break;
         }
     }
 
@@ -204,9 +317,10 @@ public final class NatsReader implements Supplier<List<EventMessage>>, NatsConsu
     /**
      * This consolidates the serialization to a ByteArrayOutputStream, and since the JSONEvent implements EventSerialization,
      * this convenience method should be used to simplify the publishing code.
-     * @param event the event that needs to be serialized (not sure how this could be multiples)
+     *
+     * @param event     the event that needs to be serialized (not sure how this could be multiples)
      * @param numEvents the number of events - this really should just be 1
-     * @param subject the subject to be used when publishing the events
+     * @param subject   the subject to be used when publishing the events
      */
     public void publish(EventSerialization event, int numEvents, String subject) {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -253,7 +367,7 @@ public final class NatsReader implements Supplier<List<EventMessage>>, NatsConsu
         /*
          * Consume all the events in the stream
          */
-        System.out.println("Creating subscriber for subject: " + configuration.getSubjectName() + " with durablename: " + configuration.getDurableName());
+        System.out.println("Creating subscriber for subject: " + configuration.getSubjectName() + " with durable name: " + configuration.getDurableName());
         return js.subscribe(configuration.getSubjectName(), pullOptions);
     }
 
@@ -266,13 +380,16 @@ public final class NatsReader implements Supplier<List<EventMessage>>, NatsConsu
      * @throws IOException
      */
     private JetStreamSubscription getFilteredPullSubscribeOptions(JetStream js) throws JetStreamApiException, IOException {
+
+        logger.error("Filtering with {}", configuration.getFilter());
+        logger.error("Subject is {}", configuration.getSubjectName());
+
         ConsumerConfiguration cc = ConsumerConfiguration.builder()
                 .filterSubject(configuration.getFilter())
                 .durable(configuration.getDurableName())
                 .maxAckPending(MAX_ACK_PENDING) // as we are pull we should ste to -1 to allow us to scale out
                 .build();
         PullSubscribeOptions pullOptions = PullSubscribeOptions.builder().configuration(cc).build();
-        logger.info("filter-consumer filtered on {} ", configuration.getFilter());
         /*
          * Consume all the events in the stream
          */
@@ -345,10 +462,33 @@ public final class NatsReader implements Supplier<List<EventMessage>>, NatsConsu
         }
         while (msg != null) {
             if (msg.isJetStream()) {
-                EventMessage pojo = null;
+                EventMessage pojo;
                 try {
                     pojo = event.deserialize(new ByteArrayInputStream(msg.getData()));
-                    messages.add(pojo);
+                    // should we keep it?
+                    if (ObjectUtils.isNotEmpty(ratingEventType) || ObjectUtils.isNotEmpty(eventType)) {
+                        boolean shouldMatchEventType = ObjectUtils.isNotEmpty(eventType);
+                        boolean shouldMatchRateEventType = ObjectUtils.isNotEmpty(ratingEventType);
+
+                        boolean matchesEventType = shouldMatchEventType && String.valueOf(pojo.getEventType()).equalsIgnoreCase(String.valueOf(eventType));
+                        boolean matchesRateEventType = shouldMatchRateEventType && pojo.getRateEventType().equalsIgnoreCase(ratingEventType);
+
+                        if (shouldMatchEventType && shouldMatchRateEventType) {
+                            if (matchesEventType && matchesRateEventType) {
+                                messages.add(pojo);
+                            }
+                        }
+                        else if (shouldMatchEventType && matchesEventType) {
+                            messages.add(pojo);
+                        }
+                        else if (shouldMatchRateEventType && matchesRateEventType) {
+                            messages.add(pojo);
+                        }
+
+                    }
+                    else {
+                        messages.add(pojo);
+                    }
                     totalRead++;
                     msg.ack();
                     /*
@@ -381,8 +521,7 @@ public final class NatsReader implements Supplier<List<EventMessage>>, NatsConsu
      */
     private int calculateBatchSize() {
         int outStanding = configuration.getBatchSize() - totalRead;
-
-        return outStanding > MAX_ALLOWED_BATCH_SIZE ? MAX_ALLOWED_BATCH_SIZE : outStanding;
+        return Math.min(outStanding, MAX_ALLOWED_BATCH_SIZE);
     }
 
     /**
@@ -402,15 +541,17 @@ public final class NatsReader implements Supplier<List<EventMessage>>, NatsConsu
          * Perhaps we should drive this from the command line to build the
          * stream up front using nats.cli.
          */
+        logger.error("Attempting to get the Stream Config for {}", configuration.getStreamName() + rootCustomerIdHash);
+        logger.error("Subject Name {}", configuration.getSubjectName());
         StreamConfiguration streamConfig = StreamConfiguration.builder()
-                .name(configuration.getStreamName())
+                .name(configuration.getStreamName() + rootCustomerIdHash)
                 .subjects(configuration.getSubjectName())
                 .storageType(StorageType.File)
                 .replicas(configuration.getNumberOfReplicas())
                 .maxMessagesPerSubject(Long.MAX_VALUE)
                 .build();
         // Create the stream
-        StreamInfo streamInfo = getStreamInfo(jsm, configuration.getStreamName(), false);
+        StreamInfo streamInfo = getStreamInfo(jsm, configuration.getStreamName() + rootCustomerIdHash, false);
         if (streamInfo == null) {
             jsm.addStream(streamConfig);
         }
@@ -461,7 +602,7 @@ public final class NatsReader implements Supplier<List<EventMessage>>, NatsConsu
              */
             for (int part = 0; part < numberPartitions; ++part) {
                 String partition = Integer.toString(part);
-                String streamName = configuration.getStreamName() + "_" + partition;
+                String streamName = configuration.getStreamName() + partition;
                 String subjectName = "Events." + partition + ".>";
                 StreamConfiguration streamConfig = StreamConfiguration.builder()
                         .name(streamName)
@@ -507,8 +648,7 @@ public final class NatsReader implements Supplier<List<EventMessage>>, NatsConsu
 
             for (int part = 0; part < numberPartitions; ++part) {
                 String partition = Integer.toString(part);
-                String streamName = configuration.getStreamName() + "_" + partition;
-                String subjectName = "Events." + partition + ".>";
+                String streamName = configuration.getStreamName() + partition;
                 StreamInfo strDetails = jsm.getStreamInfo(streamName);
                 if (strDetails != null) {
                     jsm.deleteStream(streamName);
