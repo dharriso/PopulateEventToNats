@@ -61,4 +61,6 @@ public interface EventMessage {
     byte[] getUniversalAttribute2();
     byte[] getUniversalAttribute3();
     byte[] getUniversalAttribute4();
+
+    String toString();
 }
