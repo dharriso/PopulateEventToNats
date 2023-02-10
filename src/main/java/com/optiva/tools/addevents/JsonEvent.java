@@ -3,19 +3,19 @@ package com.optiva.tools.addevents;
 import com.dslplatform.json.CompiledJson;
 import com.dslplatform.json.DslJson;
 import com.dslplatform.json.JsonAttribute;
-import com.dslplatform.json.JsonWriter;
 
+import javax.xml.bind.DatatypeConverter;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.Arrays;
+import java.nio.charset.StandardCharsets;
 import java.util.Calendar;
 import java.util.Date;
 
 @CompiledJson(onUnknown = CompiledJson.Behavior.IGNORE, objectFormatPolicy = CompiledJson.ObjectFormatPolicy.MINIMAL)
-public final class JsonEvent implements EventMessage, EventSerialization {
-    private final DslJson<Object> dsl;
-    private int timeId;
+public final class JsonEvent {
+    private DslJson<Object> dsl;
+    private long timeId;
     private int useId;
     private long eventId;
     private String accessKey;
@@ -61,20 +61,21 @@ public final class JsonEvent implements EventMessage, EventSerialization {
     private int dayId;
 
     public JsonEvent() {
-        dsl = new DslJson<>();
-        JsonWriter writer = dsl.newWriter();
+//        dsl = new DslJson<>();
+//        JsonWriter writer = dsl.newWriter();
     }
 
     public void serialize(ByteArrayOutputStream output) throws IOException {
-        dsl.serialize(this, output);
+//        dsl.serialize(this, output);
     }
 
     public JsonEvent deserialize(ByteArrayInputStream input) throws IOException {
-        return dsl.deserialize(JsonEvent.class, input);
+//        return dsl.deserialize(JsonEvent.class, input);
+        return null;
     }
 
     @JsonAttribute(name = "tid", index = 1)
-    public int getTimeId() {
+    public long getTimeId() {
         return timeId;
     }
 
@@ -270,7 +271,11 @@ public final class JsonEvent implements EventMessage, EventSerialization {
 
     @JsonAttribute(name = "pao", index = 39)
     public String getProjectAddOn() {
-        return projectAddOn;
+        if  (projectAddOn == null) {
+            return null;
+        }
+
+        return DatatypeConverter.printBase64Binary(projectAddOn.getBytes(StandardCharsets.UTF_8));
     }
 
     public void setProjectAddOn(final String projectAddOn) {
@@ -295,6 +300,86 @@ public final class JsonEvent implements EventMessage, EventSerialization {
 
     public void setRefUseId(final int refUseId) {
         this.refUseId = refUseId;
+    }
+
+    @JsonAttribute(name = "did", index = 38)
+    public int getDayId() {
+        return dayId;
+    }
+
+    public byte[] getInternalRatingRelevant() {
+        return new byte[0];
+    }
+
+    public byte[] getExternalRatingIrrelevant() {
+        return new byte[0];
+    }
+
+    public byte[] getExternalRatingResult() {
+        return new byte[0];
+    }
+
+    public byte[] getExternalDataTransp() {
+        return new byte[0];
+    }
+
+    @JsonAttribute(name = "ua0", index = 33)
+    public byte[] getUniversalAttribute0() {
+        return universalAttribute0;
+    }
+
+    public void setUniversalAttribute0(final byte[] universalAttribute0) {
+        if (null != universalAttribute0) {
+            this.universalAttribute0 = universalAttribute0;
+        }
+    }
+
+    @JsonAttribute(name = "ua1", index = 34)
+    public byte[] getUniversalAttribute1() {
+        return universalAttribute1;
+    }
+
+    public void setUniversalAttribute1(final byte[] universalAttribute1) {
+        if (null != universalAttribute1) {
+            this.universalAttribute1 = universalAttribute1;
+        }
+    }
+
+    @JsonAttribute(name = "ua2", index = 35)
+    public byte[] getUniversalAttribute2() {
+        return universalAttribute2;
+    }
+
+    public void setUniversalAttribute2(final byte[] universalAttribute2) {
+        if (null != universalAttribute2) {
+            this.universalAttribute2 = universalAttribute2;
+        }
+    }
+
+    @JsonAttribute(name = "ua3", index = 36)
+    public byte[] getUniversalAttribute3() {
+        return universalAttribute3;
+    }
+
+    public void setUniversalAttribute3(final byte[] universalAttribute3) {
+        if (null != universalAttribute3) {
+            this.universalAttribute3 = universalAttribute3;
+        }
+    }
+
+    @JsonAttribute(name = "ua4", index = 37)
+    public byte[] getUniversalAttribute4() {
+        return universalAttribute4;
+    }
+
+    public void setUniversalAttribute4(final byte[] universalAttribute4) {
+        if (null != universalAttribute4) {
+            this.universalAttribute4 = universalAttribute4;
+        }
+    }
+
+    public void setDayId(final int dayId) {
+        this.dayId = dayId;
     }
 
     @JsonAttribute(name = "irr0", index = 21)
@@ -341,7 +426,7 @@ public final class JsonEvent implements EventMessage, EventSerialization {
         }
     }
 
-    @JsonAttribute(name = "eri1",index = 25)
+    @JsonAttribute(name = "eri1", index = 25)
     public byte[] getExternalRatingIrrelevant1() {
         return externalRatingIrrelevant1;
     }
@@ -352,7 +437,7 @@ public final class JsonEvent implements EventMessage, EventSerialization {
         }
     }
 
-    @JsonAttribute(name = "eri2",index = 26)
+    @JsonAttribute(name = "eri2", index = 26)
     public byte[] getExternalRatingIrrelevant2() {
         return externalRatingIrrelevant2;
     }
@@ -363,7 +448,7 @@ public final class JsonEvent implements EventMessage, EventSerialization {
         }
     }
 
-    @JsonAttribute(name = "err0",index = 27)
+    @JsonAttribute(name = "err0", index = 27)
     public byte[] getExternalRatingResult0() {
         return externalRatingResult0;
     }
@@ -374,7 +459,7 @@ public final class JsonEvent implements EventMessage, EventSerialization {
         }
     }
 
-    @JsonAttribute(name = "err1",index = 28)
+    @JsonAttribute(name = "err1", index = 28)
     public byte[] getExternalRatingResult1() {
         return externalRatingResult1;
     }
@@ -385,7 +470,7 @@ public final class JsonEvent implements EventMessage, EventSerialization {
         }
     }
 
-    @JsonAttribute(name = "err2",index = 29)
+    @JsonAttribute(name = "err2", index = 29)
     public byte[] getExternalRatingResult2() {
         return externalRatingResult2;
     }
@@ -396,7 +481,7 @@ public final class JsonEvent implements EventMessage, EventSerialization {
         }
     }
 
-    @JsonAttribute(name = "edt0",index = 30)
+    @JsonAttribute(name = "edt0", index = 30)
     public byte[] getExternalDataTransp0() {
         return externalDataTransp0;
     }
@@ -407,7 +492,7 @@ public final class JsonEvent implements EventMessage, EventSerialization {
         }
     }
 
-    @JsonAttribute(name = "edt1",index = 31)
+    @JsonAttribute(name = "edt1", index = 31)
     public byte[] getExternalDataTransp1() {
         return externalDataTransp1;
     }
@@ -418,7 +503,7 @@ public final class JsonEvent implements EventMessage, EventSerialization {
         }
     }
 
-    @JsonAttribute(name = "edt2",index = 32)
+    @JsonAttribute(name = "edt2", index = 32)
     public byte[] getExternalDataTransp2() {
         return externalDataTransp2;
     }
@@ -429,141 +514,57 @@ public final class JsonEvent implements EventMessage, EventSerialization {
         }
     }
 
-    @JsonAttribute(name = "ua0",index = 33)
-    public byte[] getUniversalAttribute0() {
-        return universalAttribute0;
-    }
-
-    public void setUniversalAttribute0(final byte[] universalAttribute0) {
-        if (null != universalAttribute0) {
-            this.universalAttribute0 = universalAttribute0;
-        }
-    }
-
-    @JsonAttribute(name = "ua1",index = 34)
-    public byte[] getUniversalAttribute1() {
-        return universalAttribute1;
-    }
-
-    public void setUniversalAttribute1(final byte[] universalAttribute1) {
-        if (null != universalAttribute1) {
-            this.universalAttribute1 = universalAttribute1;
-        }
-    }
-
-    @JsonAttribute(name = "ua2",index = 35)
-    public byte[] getUniversalAttribute2() {
-        return universalAttribute2;
-    }
-
-    public void setUniversalAttribute2(final byte[] universalAttribute2) {
-        if (null != universalAttribute2) {
-            this.universalAttribute2 = universalAttribute2;
-        }
-    }
-
-    @JsonAttribute(name = "ua3",index = 36)
-    public byte[] getUniversalAttribute3() {
-        return universalAttribute3;
-    }
-
-    public void setUniversalAttribute3(final byte[] universalAttribute3) {
-        if (null != universalAttribute3) {
-            this.universalAttribute3 = universalAttribute3;
-        }
-    }
-
-    @JsonAttribute(name = "ua4",index = 37)
-    public byte[] getUniversalAttribute4() {
-        return universalAttribute4;
-    }
-
-    public void setUniversalAttribute4(final byte[] universalAttribute4) {
-        if (null != universalAttribute4) {
-            this.universalAttribute4 = universalAttribute4;
-        }
-    }
-
-    @JsonAttribute(name = "did",index = 38)
-    public int getDayId() {
-        return dayId;
-    }
-
-    @Override
-    public byte[] getInternalRatingRelevant() {
-        return new byte[0];
-    }
-
-    @Override
-    public byte[] getExternalRatingIrrelevant() {
-        return new byte[0];
-    }
-
-    @Override
-    public byte[] getExternalRatingResult() {
-        return new byte[0];
-    }
-
-    @Override
-    public byte[] getExternalDataTransp() {
-        return new byte[0];
-    }
-
-    public void setDayId(final int dayId) {
-        this.dayId = dayId;
-    }
-
-    public  JsonEvent withTimeId(int timeId) {
+    public JsonEvent withTimeId(long timeId) {
         this.timeId = timeId;
         return this;
     }
 
-    public  JsonEvent withUseId(int useId) {
+    public JsonEvent withUseId(int useId) {
         this.useId = useId;
         return this;
     }
 
-    public  JsonEvent withEventId(long eventId) {
+    public JsonEvent withEventId(long eventId) {
         this.eventId = eventId;
         return this;
     }
 
-    public  JsonEvent withAccessKey(String accessKey) {
+    public JsonEvent withAccessKey(String accessKey) {
         this.accessKey = accessKey;
         return this;
     }
 
-    public  JsonEvent withAccessKeyType(int accessKeyType) {
+    public JsonEvent withAccessKeyType(int accessKeyType) {
         this.accessKeyType = accessKeyType;
         return this;
     }
 
-    public  JsonEvent withOwningCustomerID(String owningCustomerID) {
+    public JsonEvent withOwningCustomerID(String owningCustomerID) {
         this.owningCustomerID = owningCustomerID;
         return this;
     }
 
-    public  JsonEvent withRootCustomerID(String rootCustomerID) {
+    public JsonEvent withRootCustomerID(String rootCustomerID) {
         this.rootCustomerID = rootCustomerID;
         return this;
     }
 
-    public  JsonEvent withComposedCustomerID(String composedCustomerID) {
+    public JsonEvent withComposedCustomerID(String composedCustomerID) {
         this.composedCustomerID = composedCustomerID;
         return this;
     }
 
-    public  JsonEvent withEventType(long eventType) {
+    public JsonEvent withEventType(long eventType) {
         this.eventType = eventType;
         return this;
     }
 
-    public  JsonEvent withOriginalEventTime(Date originalEventTime) {
+    public JsonEvent withOriginalEventTime(Date originalEventTime) {
         this.originalEventTime = originalEventTime;
         return this;
     }
 
-    public  JsonEvent withCreationEventTime(Date creationEventTime) {
+    public JsonEvent withCreationEventTime(Date creationEventTime) {
         this.creationEventTime = creationEventTime;
         // '2009-01-01 00:00:00', 'YYYY-MM-DD HH24:MI:SS'
         Calendar cal = Calendar.getInstance();
@@ -572,33 +573,33 @@ public final class JsonEvent implements EventMessage, EventSerialization {
         return this;
     }
 
-    public  JsonEvent withEffectiveEventTime(Date effectiveEventTime) {
+    public JsonEvent withEffectiveEventTime(Date effectiveEventTime) {
         this.effectiveEventTime = effectiveEventTime;
         return this;
 
     }
 
-    public  JsonEvent withBillCycleID(int billCycleID) {
+    public JsonEvent withBillCycleID(int billCycleID) {
         this.billCycleID = billCycleID;
         return this;
     }
 
-    public  JsonEvent withBillPeriodID(int billPeriodID) {
+    public JsonEvent withBillPeriodID(int billPeriodID) {
         this.billPeriodID = billPeriodID;
         return this;
     }
 
-    public  JsonEvent withErrorCode(int errorCode) {
+    public JsonEvent withErrorCode(int errorCode) {
         this.errorCode = errorCode;
         return this;
     }
 
-    public  JsonEvent withRateEventType(String rateEventType) {
+    public JsonEvent withRateEventType(String rateEventType) {
         this.rateEventType = rateEventType;
         return this;
     }
 
-    public  JsonEvent withExternalCorrelationID(long externalCorrelationID) {
+    public JsonEvent withExternalCorrelationID(long externalCorrelationID) {
         this.externalCorrelationID = externalCorrelationID;
         return this;
     }
