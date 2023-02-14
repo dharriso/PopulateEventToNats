@@ -1,6 +1,5 @@
 package com.optiva.tools.load;
 
-import com.optiva.tools.addevents.JsonEvent;
 import com.optiva.tools.addevents.NatsConfiguration;
 import com.optiva.tools.addevents.NatsEventPublisher;
 import com.optiva.tools.addevents.NatsReaderConfiguration;
@@ -17,8 +16,6 @@ import io.nats.client.api.ConsumerInfo;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -83,7 +80,6 @@ public class ScheduleBasedConsumer {
         }
 
         private Connection createNatsConnection() {
-            Arrays.stream(((NatsReaderConfiguration) natsConfiguration).getUrls()).forEach(System.out::println);
             Options connectionOptions = new Options.Builder().servers(((NatsReaderConfiguration)natsConfiguration).getUrls())
                                                              .connectionTimeout(Duration.ofSeconds(30))
                                                              .maxReconnects(-1)
@@ -165,7 +161,7 @@ public class ScheduleBasedConsumer {
          * @return true iff NATS has no more messages available.
          */
         private boolean readBatch(JetStreamSubscription pullSub) {
-            List<Message> msgs = pullSub.fetch(calculateBatchSize(), Duration.ofMillis(250));
+            List<Message> msgs = pullSub.fetch(calculateBatchSize(), Duration.ofMillis(1000));
             if (msgs == null || msgs.isEmpty()) {
                 return true;
             }

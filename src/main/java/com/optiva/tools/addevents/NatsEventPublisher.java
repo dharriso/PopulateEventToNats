@@ -1,6 +1,7 @@
 package com.optiva.tools.addevents;
 
 import io.nats.client.Connection;
+import io.nats.client.JetStream;
 import io.nats.client.JetStreamApiException;
 import io.nats.client.JetStreamOptions;
 import io.nats.client.Message;
@@ -18,13 +19,14 @@ public class NatsEventPublisher {
 
     public static final JetStreamOptions JET_STREAM_OPTIONS = JetStreamOptions.builder().publishNoAck(false).requestTimeout(Duration.ofSeconds(30)).build();
 
-    private final NatsConfiguration configuration;
-
     private final Connection connection;
 
+    private final JetStream jetStream;
+
+    private final PublishOptions publishOptions;
+
     public NatsEventPublisher(final NatsConfiguration configuration) {
-        this.configuration = configuration;
-        Options connectionOptions = new Options.Builder().servers(((NatsReaderConfiguration) this.configuration).getUrls())
+        Options connectionOptions = new Options.Builder().servers(((NatsReaderConfiguration) configuration).getUrls())
                                                          .connectionTimeout(Duration.ofSeconds(30))
                                                          .maxReconnects(-1)
                                                          .reconnectBufferSize(configuration.getConnectionByteBufferSize())
@@ -33,6 +35,8 @@ public class NatsEventPublisher {
 
         try {
             connection = Nats.connect(connectionOptions);
+            jetStream = connection.jetStream(JET_STREAM_OPTIONS);
+            publishOptions = PublishOptions.builder().streamTimeout(Duration.ofSeconds(30)).stream(configuration.getStreamName()).build();
         } catch (IOException | InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException(new NatsEventException("NatsConnection#initialize Error with connection ", e));
@@ -49,12 +53,10 @@ public class NatsEventPublisher {
     public void publish(ByteArrayOutputStream event, String subject) throws NatsEventException {
         try {
             Message msg = NatsMessage.builder().subject(subject).data(event.toByteArray()).build();
-            PublishOptions publishOptions = PublishOptions.builder().streamTimeout(Duration.ofSeconds(30)).stream(configuration.getStreamName()).build();
-            PublishAck ack = getNatsConnection().jetStream(JET_STREAM_OPTIONS).publish(msg, publishOptions);
+            PublishAck ack = jetStream.publish(msg, publishOptions);
             if (ack != null) {
                 if (ack.hasError()) {
                     String errMsg = "NatsEventPublisher#publish --> Message publishing ack returned an error : ";
-
                     throw new NatsEventException(errMsg + ack.getError());
                 }
             } else {
@@ -66,11 +68,6 @@ public class NatsEventPublisher {
             throw new NatsEventException(errMsg + e.getMessage(), e);
         }
     }
-
-    public Connection getNatsConnection() {
-        return connection;
-    }
-
     public void close() {
         try {
             connection.close();

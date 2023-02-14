@@ -1,14 +1,11 @@
 package com.optiva.tools.addevents;
 
+import com.optiva.tools.load.NeverClosingSingleConsumer;
 import com.optiva.tools.load.ScheduleBasedConsumer;
 import com.optiva.tools.load.TimebasedLoader;
-import org.apache.commons.lang3.ObjectUtils;
-import org.apache.commons.lang3.time.StopWatch;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import picocli.CommandLine;
-
-import java.io.IOException;
 
 /**
  * NatsReader reads messages from NATS server. It reads a batch of messages
@@ -24,11 +21,8 @@ public final class NatsReader {
     @CommandLine.Option(names = {"-s",
                                  "--server"}, required = true, paramLabel = "NatsServer", description = "the nats server endpoint, this must also include the prefix nats and the port for example nats://192.168.49.2:30409")
     public String endpoint;
-    @CommandLine.Option(names = {"-cons",
-                                 "--consume"}, defaultValue = "false", paramLabel = "Read Blocks of messages messages from the durable consumer.", description = "If this is true, then this execution will consume messages until killed.")
-    public Boolean isAConsumer;
     @CommandLine.Option(names = {"-consName",
-                                 "--consumerName"}, defaultValue = "zdataDurName-1", paramLabel = "Name of the Durable Consumer", description = "The Consumer Name that will be used to consume messages.")
+                                 "--consumerName"}, defaultValue = "zdataDurName", paramLabel = "Name of the Durable Consumer", description = "The Consumer Name that will be used to consume messages.")
     public String consumerName;
     @CommandLine.Option(names = {"-bs", "--batchSize"}, defaultValue = "720000", paramLabel = "Batch Size", description = "Number of Messages to consumer per iteration.")
     public Integer batchSize;
@@ -77,7 +71,6 @@ public final class NatsReader {
 
         logger.error("Test to execute : {}", reader.tstName);
         logger.error("Nats Server(s) :{}", reader.endpoint);
-        logger.error("isAConsumer : {}", reader.isAConsumer);
         logger.error("consumerName : {}", reader.consumerName);
         logger.error("batchSize : {}", reader.batchSize);
         logger.error("total time in minutes : {}", reader.totalTimeInMinutes);
@@ -101,6 +94,10 @@ public final class NatsReader {
                 ScheduleBasedConsumer sbc = new ScheduleBasedConsumer(reader.configuration);
                 sbc.consume();
                 break;
+            case neverClosingSingleConsumer:
+                NeverClosingSingleConsumer neverClosingSingleConsumer = new NeverClosingSingleConsumer(reader.configuration);
+                neverClosingSingleConsumer.consume();
+                break;
         }
     }
 
@@ -112,8 +109,6 @@ public final class NatsReader {
     private String getSubject(NatsReader reader) {
         if (null == reader.subjectName || reader.subjectName.isEmpty()) {
             return "Events.>";
-        } else if (!reader.subjectName.endsWith(">")) {
-            return reader.subjectName + ".>";
         } else {
             return reader.subjectName;
         }
@@ -121,6 +116,7 @@ public final class NatsReader {
 
     enum TestCases {
         loadTest,
-        consumeOnSchedule
+        consumeOnSchedule,
+        neverClosingSingleConsumer
     }
 }
