@@ -2,6 +2,9 @@ package com.optiva.tools.addevents;
 
 import com.optiva.tools.load.NeverClosingSingleConsumer;
 import com.optiva.tools.load.ScheduleBasedConsumer;
+import com.optiva.tools.load.ScheduleBasedEphemeralPullConsumer;
+import com.optiva.tools.load.ScheduleBasedEphemeralPullConsumerIterateOverSubjects;
+import com.optiva.tools.load.ScheduleBasedEphemeralPushConsumer;
 import com.optiva.tools.load.TimebasedLoader;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -49,7 +52,6 @@ public final class NatsReader {
     TestCases tstName = null;
     private NatsConfiguration configuration;
 
-
     public NatsReader(NatsConfiguration configuration) {
         this.configuration = configuration;
     }
@@ -79,12 +81,7 @@ public final class NatsReader {
         logger.error("stream name : {}", reader.streamName);
         logger.error("subject name : {}", reader.getSubject(reader));
 
-        reader.configuration = new NatsReaderConfiguration(reader.getSubject(reader),
-                                                           reader.endpoint,
-                                                           reader.streamName,
-                                                           reader.consumerName,
-                                                           reader.batchSize,
-                                                           CONNECT_BYTE_BUFFER_SIZE);
+        reader.configuration = new NatsReaderConfiguration(reader.getSubject(reader), reader.endpoint, reader.streamName, reader.consumerName, reader.batchSize, CONNECT_BYTE_BUFFER_SIZE);
         switch (reader.tstName) {
             case loadTest:
                 TimebasedLoader tbl = new TimebasedLoader(reader.totalTimeInMinutes, reader.messagesPerSecond, reader.numberOfPublishers, reader.configuration);
@@ -98,11 +95,25 @@ public final class NatsReader {
                 NeverClosingSingleConsumer neverClosingSingleConsumer = new NeverClosingSingleConsumer(reader.configuration);
                 neverClosingSingleConsumer.consume();
                 break;
+            case scheduleBasedEphemeralPushConsumer:
+                ScheduleBasedEphemeralPushConsumer scheduleBasedEphemeralPushConsumer = new ScheduleBasedEphemeralPushConsumer(reader.configuration);
+                scheduleBasedEphemeralPushConsumer.consume();
+                break;
+            case scheduleBasedEphemeralPullConsumer:
+                ScheduleBasedEphemeralPullConsumer scheduleBasedEphemeralPullConsumer = new ScheduleBasedEphemeralPullConsumer(reader.configuration);
+                scheduleBasedEphemeralPullConsumer.consume();
+                break;
+            case pullConsumerIterateOverAllSubjects:
+                ScheduleBasedEphemeralPullConsumerIterateOverSubjects scheduleBasedEphemeralPullConsumerIterateOverSubjects =
+                        new ScheduleBasedEphemeralPullConsumerIterateOverSubjects(reader.configuration);
+                scheduleBasedEphemeralPullConsumerIterateOverSubjects.consume();
+                break;
         }
     }
 
     /**
      * Defaults to Events.> if not provided on the command line
+     *
      * @param reader
      * @return
      */
@@ -117,6 +128,9 @@ public final class NatsReader {
     enum TestCases {
         loadTest,
         consumeOnSchedule,
-        neverClosingSingleConsumer
+        neverClosingSingleConsumer,
+        scheduleBasedEphemeralPushConsumer,
+        scheduleBasedEphemeralPullConsumer,
+        pullConsumerIterateOverAllSubjects
     }
 }

@@ -105,7 +105,7 @@ public class TimebasedLoader {
                     for (int i = 0; i < numberOfMessages; i++) {
                         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
                             JsonEvent event = getEvent((int) period.getTimeId(), (int) period.getUseId());
-                            String subject = String.format("Events.%s", ConvertKeyTo.bucketedCRC16("" + rnd.nextLong(), 65535));
+                            String subject = String.format(natsConfiguration.getSubjectName(), ConvertKeyTo.bucketedCRC16("" + rnd.nextLong(), 65535));
                             NatsEventSerializer.getInstance().serialize(event, baos);
                             publisher.publish(baos, subject);
                         } catch (IOException | NatsEventException e) {
