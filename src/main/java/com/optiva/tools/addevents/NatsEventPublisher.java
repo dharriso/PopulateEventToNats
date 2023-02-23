@@ -17,7 +17,7 @@ import java.time.Duration;
 
 public class NatsEventPublisher {
 
-    public static final JetStreamOptions JET_STREAM_OPTIONS = JetStreamOptions.builder().publishNoAck(false).requestTimeout(Duration.ofSeconds(30)).build();
+    public static final JetStreamOptions JET_STREAM_OPTIONS = JetStreamOptions.builder().publishNoAck(false).requestTimeout(Duration.ofMinutes(3)).build();
 
     private final Connection connection;
 
@@ -36,7 +36,7 @@ public class NatsEventPublisher {
         try {
             connection = Nats.connect(connectionOptions);
             jetStream = connection.jetStream(JET_STREAM_OPTIONS);
-            publishOptions = PublishOptions.builder().streamTimeout(Duration.ofSeconds(30)).stream(configuration.getStreamName()).build();
+            publishOptions = PublishOptions.builder().streamTimeout(Duration.ofSeconds(60)).stream(configuration.getStreamName()).build();
         } catch (IOException | InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException(new NatsEventException("NatsConnection#initialize Error with connection ", e));

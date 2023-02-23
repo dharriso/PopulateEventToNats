@@ -42,8 +42,6 @@ public class NeverClosingSingleConsumer {
                                   pullSub.getPendingMessageCount(),
                                   pullSub.getDroppedCount(),
                                   pullSub.getDeliveredCount());
-                Thread.sleep(1000);
-
             }
         } catch (Exception e) {
             close();
@@ -94,7 +92,7 @@ public class NeverClosingSingleConsumer {
     }
 
     private void consumeMessages() {
-        List<Message> messages = pullSub.fetch(natsConfiguration.getBatchSize(), Duration.ofSeconds(1));
+        List<Message> messages = pullSub.fetch(natsConfiguration.getBatchSize(), Duration.ofMillis(100));
 
         if (messages != null && !messages.isEmpty()) {
             for (Message msg : messages) {
