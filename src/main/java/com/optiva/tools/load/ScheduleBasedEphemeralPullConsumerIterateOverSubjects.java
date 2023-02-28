@@ -65,7 +65,7 @@ public class ScheduleBasedEphemeralPullConsumerIterateOverSubjects {
 
         private void consumeMessages(JetStream js) {
             for (int i = 0; i < 65535; i++) {
-                String subjectName = "Events." + i;
+                String subjectName = natsConfiguration.getSubjectName() + i;
                 try {
                     ConsumerConfiguration cc = ConsumerConfiguration.builder()
                                                                     .filterSubject(subjectName)

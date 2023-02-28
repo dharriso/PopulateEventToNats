@@ -1,6 +1,9 @@
 package com.optiva.tools.addevents;
 
+import com.optiva.tools.EventProperties;
 import com.optiva.tools.load.NeverClosingSingleConsumer;
+import com.optiva.tools.load.PushReadOneSubjectAndClose;
+import com.optiva.tools.load.PullReadOneSubjectAndClose;
 import com.optiva.tools.load.ScheduleBasedConsumer;
 import com.optiva.tools.load.ScheduleBasedEphemeralPullConsumer;
 import com.optiva.tools.load.ScheduleBasedEphemeralPullConsumerIterateOverSubjects;
@@ -71,6 +74,8 @@ public final class NatsReader {
             return;
         }
 
+        EventProperties.setAll(reader);
+
         logger.error("Test to execute : {}", reader.tstName);
         logger.error("Nats Server(s) :{}", reader.endpoint);
         logger.error("consumerName : {}", reader.consumerName);
@@ -81,7 +86,7 @@ public final class NatsReader {
         logger.error("stream name : {}", reader.streamName);
         logger.error("subject name : {}", reader.getSubject(reader));
 
-        reader.configuration = new NatsReaderConfiguration(reader.getSubject(reader), reader.endpoint, reader.streamName, reader.consumerName, reader.batchSize, CONNECT_BYTE_BUFFER_SIZE);
+        reader.configuration = new NatsReaderConfiguration(reader.getSubject(reader), reader.endpoint.trim().split(" "), reader.streamName, reader.consumerName, reader.batchSize, CONNECT_BYTE_BUFFER_SIZE);
         switch (reader.tstName) {
             case loadTest:
                 TimebasedLoader tbl = new TimebasedLoader(reader.totalTimeInMinutes, reader.messagesPerSecond, reader.numberOfPublishers, reader.configuration);
@@ -108,6 +113,14 @@ public final class NatsReader {
                         new ScheduleBasedEphemeralPullConsumerIterateOverSubjects(reader.configuration);
                 scheduleBasedEphemeralPullConsumerIterateOverSubjects.consume();
                 break;
+            case pushReadOneSubjectAndClose:
+                PushReadOneSubjectAndClose readOneSubjectAndClose = new PushReadOneSubjectAndClose(reader.configuration);
+                readOneSubjectAndClose.consume();
+                break;
+            case pullReadOneSubjectAndClose:
+                PullReadOneSubjectAndClose pullReadOneSubject = new PullReadOneSubjectAndClose(reader.configuration);
+                pullReadOneSubject.consume();
+                break;
         }
     }
 
@@ -131,6 +144,9 @@ public final class NatsReader {
         neverClosingSingleConsumer,
         scheduleBasedEphemeralPushConsumer,
         scheduleBasedEphemeralPullConsumer,
-        pullConsumerIterateOverAllSubjects
+        pullConsumerIterateOverAllSubjects,
+        pushReadOneSubjectAndClose,
+        pullReadOneSubjectAndClose
+
     }
 }

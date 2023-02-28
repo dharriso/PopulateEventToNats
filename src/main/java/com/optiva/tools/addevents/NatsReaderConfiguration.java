@@ -4,7 +4,7 @@ import java.util.Objects;
 
 public final class NatsReaderConfiguration implements NatsConfiguration {
     private final String subjectName;
-    private final String url;
+    private String[] url;
     private final String streamName;
     private final String durableName;
     private final Integer batchSize;
@@ -19,7 +19,7 @@ public final class NatsReaderConfiguration implements NatsConfiguration {
      * @param connectionByteBufferSize
      */
     public NatsReaderConfiguration(String subjectName,
-                                   String url,
+                                   String[] url,
                                    String streamName,
                                    String durableName,
                                    int batchSize,
@@ -27,7 +27,6 @@ public final class NatsReaderConfiguration implements NatsConfiguration {
         this.connectionByteBufferSize = connectionByteBufferSize;
         this.subjectName = Objects.requireNonNull(subjectName);
         this.durableName = Objects.requireNonNull(durableName);
-        this.url = Objects.requireNonNull(url);
 
         if (subjectName.isEmpty()) {
             throw new IllegalArgumentException("Subject Name must be a valid string");
@@ -35,15 +34,13 @@ public final class NatsReaderConfiguration implements NatsConfiguration {
         if (durableName.isEmpty()) {
             throw new IllegalArgumentException("Durable Name must be a valid string");
         }
-        if (url.isEmpty()) {
-            throw new IllegalArgumentException("NATS URL must be a valid string");
-        }
         if (batchSize <= 0) {
             throw new IllegalArgumentException("Batch size must be greater than zero");
         }
 
         this.streamName = streamName;
         this.batchSize = batchSize;
+        this.url = url;
     }
 
     @Override
@@ -77,6 +74,6 @@ public final class NatsReaderConfiguration implements NatsConfiguration {
     }
 
     public String[] getUrls() {
-        return url.trim().split(" ");
+        return url;
     }
 }
