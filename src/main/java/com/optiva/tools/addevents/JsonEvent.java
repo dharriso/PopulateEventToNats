@@ -1,7 +1,6 @@
 package com.optiva.tools.addevents;
 
 import com.dslplatform.json.CompiledJson;
-import com.dslplatform.json.DslJson;
 import com.dslplatform.json.JsonAttribute;
 
 import javax.xml.bind.DatatypeConverter;
@@ -14,9 +13,10 @@ import java.util.Date;
 
 @CompiledJson(onUnknown = CompiledJson.Behavior.IGNORE, objectFormatPolicy = CompiledJson.ObjectFormatPolicy.MINIMAL)
 public final class JsonEvent {
-    private DslJson<Object> dsl;
-    private long timeId;
+
     private int useId;
+
+    private int timeId;
     private long eventId;
     private String accessKey;
     // optional
@@ -61,8 +61,6 @@ public final class JsonEvent {
     private int dayId;
 
     public JsonEvent() {
-//        dsl = new DslJson<>();
-//        JsonWriter writer = dsl.newWriter();
     }
 
     public void serialize(ByteArrayOutputStream output) throws IOException {
@@ -74,14 +72,9 @@ public final class JsonEvent {
         return null;
     }
 
-    @JsonAttribute(name = "tid", index = 1)
-    public long getTimeId() {
-        return timeId;
-    }
 
-    public void setTimeId(final int timeId) {
-        this.timeId = timeId;
-    }
+
+
 
     @JsonAttribute(name = "uid", index = 2)
     public int getUseId() {
@@ -232,6 +225,15 @@ public final class JsonEvent {
 
     public boolean hasErrorCode() {
         return errorCode != null;
+    }
+
+    @JsonAttribute(name = "tid", index = 1)
+    public int getTimeId() {
+        return timeId;
+    }
+
+    public void setTimeId(int jsonTimeId) {
+        this.timeId = jsonTimeId;
     }
 
     @JsonAttribute(name = "ret", index = 14)
@@ -514,11 +516,6 @@ public final class JsonEvent {
         }
     }
 
-    public JsonEvent withTimeId(long timeId) {
-        this.timeId = timeId;
-        return this;
-    }
-
     public JsonEvent withUseId(int useId) {
         this.useId = useId;
         return this;
@@ -706,6 +703,11 @@ public final class JsonEvent {
 
     public JsonEvent withUniversalAttribute4(byte[] universalAttribute4) {
         this.universalAttribute4 = universalAttribute4;
+        return this;
+    }
+
+    public JsonEvent withTimeId(int jsonTimeId) {
+        this.timeId = jsonTimeId;
         return this;
     }
 

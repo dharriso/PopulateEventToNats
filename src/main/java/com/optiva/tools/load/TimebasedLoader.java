@@ -66,10 +66,6 @@ public class TimebasedLoader {
                 executorService.awaitTermination(5, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 // we are ending the process anyway, no need to exit abnormally
-            } finally {
-                for (NatsEventPublisher publisher : publishers) {
-                    publisher.close();
-                }
             }
         });
 
@@ -98,13 +94,13 @@ public class TimebasedLoader {
 
         @Override
         public void run() {
-            Period period = Period.now();
+
             for (int p = 0; p < numberOfPublishers; p++) {
                 NatsEventPublisher publisher = publishers.get(p);
                 publisherExecutorService.execute(() -> {
                     for (int i = 0; i < numberOfMessages; i++) {
                         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-                            JsonEvent event = getEvent((int) period.getTimeId(), (int) period.getUseId());
+                            JsonEvent event = getEvent();
                             String subject = String.format(natsConfiguration.getSubjectName(), ConvertKeyTo.bucketedCRC16("" + rnd.nextLong(), 65535));
                             NatsEventSerializer.getInstance().serialize(event, baos);
                             publisher.publish(baos, subject);
@@ -116,15 +112,16 @@ public class TimebasedLoader {
             }
         }
 
-        private JsonEvent getEvent(int timeid, int useid) {
+        private JsonEvent getEvent() {
+            Period period = Period.now();
             Date now = java.util.Calendar.getInstance().getTime();
-            return new JsonEvent().withTimeId(timeid)
-                                  .withUseId(useid)
+            return new JsonEvent().withTimeId((int)period.getTimeId())
+                                  .withUseId((int)period.getUseId())
                                   .withEventId(System.currentTimeMillis() + idSequence.incrementAndGet())
                                   .withInternalRatingRelevant0(RandomStringUtils.randomAlphabetic(1000).getBytes(StandardCharsets.UTF_8))
                                   .withAccessKey("0")
                                   .withOwningCustomerID("owningCustomerID")
-                                  .withRootCustomerID("rootCustomerID")
+                                  .withRootCustomerID(""+period.getTimeId())
                                   .withEventType(40000)
                                   .withOriginalEventTime(now)
                                   .withCreationEventTime(now)
@@ -132,7 +129,7 @@ public class TimebasedLoader {
                                   .withBillCycleID(1)
                                   .withBillPeriodID(98)
                                   .withRateEventType("rateEventType")
-                                  .withRootCustomerIDHash(timeid);
+                                  .withRootCustomerIDHash(ConvertKeyTo.bucketedCRC16(""+period.getTimeId(), 256));
         }
     }
 }

@@ -1,46 +1,23 @@
 package com.optiva.tools.addevents;
 
-import io.nats.client.Connection;
-import io.nats.client.JetStream;
-import io.nats.client.JetStreamApiException;
+import com.optiva.tools.load.AsyncPublishingConnectionManager;
 import io.nats.client.JetStreamOptions;
-import io.nats.client.Message;
-import io.nats.client.Nats;
-import io.nats.client.Options;
-import io.nats.client.PublishOptions;
 import io.nats.client.api.PublishAck;
-import io.nats.client.impl.NatsMessage;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.time.Duration;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public class NatsEventPublisher {
 
     public static final JetStreamOptions JET_STREAM_OPTIONS = JetStreamOptions.builder().publishNoAck(false).requestTimeout(Duration.ofMinutes(3)).build();
-
-    private final Connection connection;
-
-    private final JetStream jetStream;
-
-    private final PublishOptions publishOptions;
+    private final NatsConfiguration natsConfiguration;
 
     public NatsEventPublisher(final NatsConfiguration configuration) {
-        Options connectionOptions = new Options.Builder().servers(((NatsReaderConfiguration) configuration).getUrls())
-                                                         .connectionTimeout(Duration.ofSeconds(30))
-                                                         .maxReconnects(-1)
-                                                         .reconnectBufferSize(configuration.getConnectionByteBufferSize())
-                                                         .turnOnAdvancedStats()
-                                                         .build();
-
-        try {
-            connection = Nats.connect(connectionOptions);
-            jetStream = connection.jetStream(JET_STREAM_OPTIONS);
-            publishOptions = PublishOptions.builder().streamTimeout(Duration.ofSeconds(60)).stream(configuration.getStreamName()).build();
-        } catch (IOException | InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException(new NatsEventException("NatsConnection#initialize Error with connection ", e));
-        }
+        this.natsConfiguration = configuration;
     }
 
     /**
@@ -50,33 +27,29 @@ public class NatsEventPublisher {
      * @param subject String representation of message subject e.g. 100.23.66.66
      * @throws NatsEventException custom exception to hold any errors while publishing
      */
-    public void publish(ByteArrayOutputStream event, String subject) throws NatsEventException {
+    public void publish(ByteArrayOutputStream event, String subject, String streamName) throws NatsEventException {
         try {
-            Message msg = NatsMessage.builder().subject(subject).data(event.toByteArray()).build();
-            PublishAck ack = jetStream.publish(msg, publishOptions);
-            if (ack != null) {
+            CompletableFuture<PublishAck> futureAck = AsyncPublishingConnectionManager.getInstance().publishAysnc(event, subject, streamName);
+            if (futureAck != null) {
+                PublishAck ack = futureAck.get(30, TimeUnit.SECONDS);;
                 if (ack.hasError()) {
                     String errMsg = "NatsEventPublisher#publish --> Message publishing ack returned an error : ";
                     throw new NatsEventException(errMsg + ack.getError());
                 }
             } else {
-                String errMsg = "NatsEventPublisher#publish --> PublishAck object was NULL ";
+                String errMsg = "NatsEventPublisher#publish --> Future<PublishAck> object was NULL ";
                 throw new NatsEventException(errMsg);
             }
-        } catch (IOException | JetStreamApiException e) {
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {
             String errMsg = "NatsEventPublisher#publish --> exception when publishing : ";
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             throw new NatsEventException(errMsg + e.getMessage(), e);
         }
     }
-    public void close() {
-        try {
-            connection.close();
-        } catch (Exception e) {
-            //
-        }
-    }
 
-    public void printConnectionStats() {
-        System.out.println(connection.getStatistics());
+    public void publish(ByteArrayOutputStream event, String subject) throws NatsEventException {
+        publish(event, subject, natsConfiguration.getStreamName());
     }
 }
